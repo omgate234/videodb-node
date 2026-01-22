@@ -184,6 +184,22 @@ export class Collection implements ICollection {
   };
 
   /**
+   * Delete the test asset.
+   * @param testAssetId - ID of the test asset to delete
+   * @returns A promise that resolves when delete is successful
+   * @throws an error if the request fails
+   */
+  public deleteTestAsset = async (testAssetId: string) => {
+    if (!testAssetId.trim()) {
+      throw new VideodbError('Test asset ID cannot be empty');
+    }
+    return await this.#vhttp.delete<Record<string, never>>(
+      [ApiPath.test_assets, testAssetId],
+      { params: { collection_id: this.meta.id } }
+    );
+  };
+
+  /**
    * @param filePath - absolute path to a file
    * @param callbackUrl- [optional] A url that will be called once upload is finished
    * @param name - [optional] Name of the file
