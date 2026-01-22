@@ -1,0 +1,203 @@
+name: Generate Node SDK from Python
+
+on:
+  repository_dispatch:
+    types: [python-updated]
+
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      before_sha:
+        description: 'Before commit SHA in Python SDK'
+        required: false
+      after_sha:
+        description: 'After commit SHA in Python SDK'
+        required: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout Node SDK
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Set commit SHAs
+        id: shas
+        run: |
+          if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
+            echo "before_sha=${{ github.event.client_payload.before_sha }}" >> $GITHUB_OUTPUT
+            echo "after_sha=${{ github.event.client_payload.after_sha }}" >> $GITHUB_OUTPUT
+            echo "source_repo=${{ github.event.client_payload.source_repo }}" >> $GITHUB_OUTPUT
+            echo "commit_message=${{ github.event.client_payload.commit_message }}" >> $GITHUB_OUTPUT
+            echo "changed_files=${{ github.event.client_payload.changed_files }}" >> $GITHUB_OUTPUT
+          else
+            # Manual trigger
+            SOURCE_REPO="${{ github.repository_owner }}/videodb-python"
+            echo "source_repo=$SOURCE_REPO" >> $GITHUB_OUTPUT
+            echo "commit_message=Manual trigger" >> $GITHUB_OUTPUT
+            echo "changed_files=" >> $GITHUB_OUTPUT
+
+            if [[ -n "${{ inputs.before_sha }}" ]]; then
+              echo "before_sha=${{ inputs.before_sha }}" >> $GITHUB_OUTPUT
+            else
+              echo "before_sha=" >> $GITHUB_OUTPUT
+            fi
+
+            if [[ -n "${{ inputs.after_sha }}" ]]; then
+              echo "after_sha=${{ inputs.after_sha }}" >> $GITHUB_OUTPUT
+            else
+              echo "after_sha=main" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Fetch Python SDK diff
+        id: diff
+        env:
+          GH_TOKEN: ${{ secrets.SDK_SYNC_PAT }}
+        run: |
+          SOURCE_REPO="${{ steps.shas.outputs.source_repo }}"
+          BEFORE_SHA="${{ steps.shas.outputs.before_sha }}"
+          AFTER_SHA="${{ steps.shas.outputs.after_sha }}"
+
+          echo "Fetching diff from $SOURCE_REPO"
+          echo "Before: $BEFORE_SHA"
+          echo "After: $AFTER_SHA"
+
+          # Fetch the diff
+          if [[ -n "$BEFORE_SHA" ]]; then
+            gh api \
+              -H "Accept: application/vnd.github.v3.diff" \
+              "/repos/$SOURCE_REPO/compare/${BEFORE_SHA}...${AFTER_SHA}" \
+              > python.diff 2>/dev/null || echo "Could not fetch diff"
+          else
+            echo "No before SHA available"
+            touch python.diff
+          fi
+
+          echo "Diff size: $(wc -l < python.diff) lines"
+
+      - name: Run Codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          sandbox: workspace-write
+          prompt: |
+            You are updating the VideoDB Node SDK to match changes made to the Python SDK.
+
+            ## Git Diff of Python SDK Changes
+
+            The following diff shows what changed in the Python SDK:
+
+            ```diff
+            $(cat python.diff)
+            ```
+
+            ## Your Task
+
+            1. First, read the existing Node SDK structure in `src/` to understand:
+               - Client structure and patterns
+               - Type definitions
+               - How methods are implemented
+
+            2. Translate the Python changes to TypeScript equivalents:
+
+            ## Translation Rules
+
+            | Python | TypeScript |
+            |--------|------------|
+            | `str` | `string` |
+            | `int`, `float` | `number` |
+            | `bool` | `boolean` |
+            | `None` | `null` or `undefined` |
+            | `Optional[X]` | `X \| undefined` or `X?` |
+            | `List[X]` | `X[]` |
+            | `Dict[str, X]` | `Record<string, X>` |
+            | `def method(self, ...)` | `async method(...): Promise<...>` |
+            | `@dataclass class Foo` | `interface Foo { ... }` |
+            | snake_case | camelCase |
+
+            3. Match the existing TypeScript patterns exactly:
+               - Import style
+               - Async/await usage
+               - Error handling
+               - JSDoc format (if used)
+
+            ## Important
+
+            - Do NOT modify `package.json` or version numbers
+            - Do NOT change existing exports unless adding new ones
+            - Do NOT refactor unrelated code
+            - Only implement what the diff indicates was added/changed
+            - Convert snake_case to camelCase for all identifiers
+
+      - name: Check for changes and create PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if there are changes
+          if git diff --quiet && git diff --staged --quiet; then
+            echo "No changes generated by Codex"
+            exit 0
+          fi
+
+          # Create branch
+          BRANCH="auto/python-sync-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH"
+          git add -A
+
+          # Commit
+          COMMIT_MSG="${{ steps.shas.outputs.commit_message }}"
+          git commit -m "feat: sync with Python SDK
+
+          Source: ${{ steps.shas.outputs.source_repo }}@${{ steps.shas.outputs.after_sha }}
+          Original commit: ${COMMIT_MSG}
+
+          Generated by OpenAI Codex"
+
+          # Push
+          git push origin "$BRANCH"
+
+          # Create PR
+          gh pr create \
+            --title "feat: sync with Python SDK" \
+            --body "## Summary
+
+          Automated SDK update to match Python SDK changes.
+
+          **Source**: \`${{ steps.shas.outputs.source_repo }}\`
+          **Commit**: \`${{ steps.shas.outputs.after_sha }}\`
+          **Original message**: ${{ steps.shas.outputs.commit_message }}
+
+          ## Changes
+
+          This PR was automatically generated by Codex based on the following Python SDK diff:
+
+          <details>
+          <summary>Python SDK Diff</summary>
+
+          \`\`\`diff
+          $(head -200 python.diff)
+          \`\`\`
+
+          </details>
+
+          ## Review Checklist
+
+          - [ ] TypeScript types are correct
+          - [ ] Async/await patterns match existing code
+          - [ ] camelCase naming convention followed
+          - [ ] No breaking changes introduced
+          - [ ] Tests pass locally
+
+          ---
+          *Generated by [OpenAI Codex](https://github.com/openai/codex)*"
