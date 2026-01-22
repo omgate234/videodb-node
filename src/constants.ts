@@ -36,6 +36,8 @@ export const ApiPath = {
   scenes: 'scenes',
   timeline: 'timeline',
   frame: 'frame',
+  /** Test assets */
+  test_assets: 'test-assets',
 } as const;
 
 export const ResponseStatus = {
