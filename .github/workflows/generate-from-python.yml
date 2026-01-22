@@ -86,6 +86,7 @@ jobs:
         uses: openai/codex-action@v1
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          model: o4-mini
           sandbox: workspace-write
           prompt: |
             You are updating the VideoDB Node SDK to match changes made to the Python SDK.
