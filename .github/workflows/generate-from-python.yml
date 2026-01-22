@@ -99,14 +99,35 @@ jobs:
             $(cat python.diff)
             ```
 
+            ## File Mapping: Python SDK → Node SDK
+
+            The Python SDK files map to Node SDK files as follows:
+
+            | Python File | Node File | Description |
+            |-------------|-----------|-------------|
+            | `videodb/client.py` | `src/core/connection.ts` | Main client/connection class |
+            | `videodb/collection.py` | `src/core/collection.ts` | Collection operations |
+            | `videodb/video.py` | `src/core/video.ts` | Video class and methods |
+            | `videodb/audio.py` | `src/core/audio.ts` | Audio class and methods |
+            | `videodb/image.py` | `src/core/image.ts` | Image class and methods |
+            | `videodb/scene.py` | `src/core/scene.ts` | Scene class |
+            | `videodb/shot.py` | `src/core/shot.ts` | Shot class |
+            | `videodb/timeline.py` | `src/core/timeline.ts` | Timeline class |
+            | `videodb/search.py` | `src/core/search/` | Search functionality |
+            | `videodb/_constants.py` | `src/constants.ts` | Constants and enums |
+            | `videodb/_utils/` | `src/utils/` | Utility functions |
+            | Type definitions | `src/types/` | TypeScript interfaces |
+
             ## Your Task
 
-            1. First, read the existing Node SDK structure in `src/` to understand:
-               - Client structure and patterns
-               - Type definitions
-               - How methods are implemented
-
-            2. Translate the Python changes to TypeScript equivalents:
+            1. **Identify which Python files changed** in the diff above
+            2. **Find the corresponding Node SDK file** using the mapping table
+            3. **Read both files** to understand the current implementation
+            4. **Replicate the exact same changes** in the Node SDK file:
+               - If a new method was added in Python, add the equivalent method in Node
+               - If a constant was added, add it to constants.ts
+               - If a new class was added, create the corresponding TypeScript class
+               - If parameters were added/changed, update the Node version accordingly
 
             ## Translation Rules
 
@@ -121,26 +142,35 @@ jobs:
             | `Dict[str, X]` | `Record<string, X>` |
             | `def method(self, ...)` | `async method(...): Promise<...>` |
             | `@dataclass class Foo` | `interface Foo { ... }` |
-            | snake_case | camelCase |
+            | `snake_case` | `camelCase` |
+            | `UPPER_SNAKE_CASE` | `UPPER_SNAKE_CASE` (keep same for constants) |
 
-            3. Match the existing TypeScript patterns exactly:
-               - Import style
-               - Async/await usage
-               - Error handling
-               - JSDoc format (if used)
+            ## Node SDK Patterns
+
+            - Methods that call the API should be `async` and return `Promise<T>`
+            - Use the existing `this.connection.post()` / `this.connection.get()` patterns
+            - Types go in `src/types/` directory
+            - Exports are managed in `src/index.ts`
 
             ## Important
 
-            - Do NOT modify `package.json` or version numbers
+            - Do NOT modify `package.json`, `version.ts`, or version numbers
             - Do NOT change existing exports unless adding new ones
             - Do NOT refactor unrelated code
-            - Only implement what the diff indicates was added/changed
-            - Convert snake_case to camelCase for all identifiers
+            - ONLY implement what the diff indicates was added/changed
+            - Convert `snake_case` to `camelCase` for methods and variables
+            - Keep `UPPER_SNAKE_CASE` for constants
 
       - name: Check for changes and create PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Save diff content for PR body before cleanup
+          DIFF_CONTENT=$(head -200 python.diff 2>/dev/null || echo "No diff available")
+
+          # Clean up temporary files - DO NOT commit these
+          rm -f python.diff
+
           # Configure git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -187,7 +217,7 @@ jobs:
           <summary>Python SDK Diff</summary>
 
           \`\`\`diff
-          $(head -200 python.diff)
+          ${DIFF_CONTENT}
           \`\`\`
 
           </details>
