@@ -56,6 +56,32 @@ jobs:
             fi
           fi
 
+      - name: Clone Python SDK
+        env:
+          GH_TOKEN: ${{ secrets.SDK_SYNC_PAT }}
+        run: |
+          SOURCE_REPO="${{ steps.shas.outputs.source_repo }}"
+          AFTER_SHA="${{ steps.shas.outputs.after_sha }}"
+
+          echo "Cloning Python SDK from $SOURCE_REPO at $AFTER_SHA"
+
+          # Clone the Python SDK into a subdirectory
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${SOURCE_REPO}.git" python-sdk
+
+          # Checkout the specific commit if provided
+          if [[ -n "$AFTER_SHA" && "$AFTER_SHA" != "main" ]]; then
+            cd python-sdk
+            git fetch --depth 1 origin "$AFTER_SHA"
+            git checkout "$AFTER_SHA"
+            cd ..
+          fi
+
+          # Remove .git directory - makes it READ-ONLY reference, impossible to push
+          rm -rf python-sdk/.git
+
+          echo "Python SDK cloned as read-only reference"
+          ls -la python-sdk/videodb/
+
       - name: Fetch Python SDK diff
         id: diff
         env:
@@ -91,6 +117,17 @@ jobs:
           prompt: |
             You are updating the VideoDB Node SDK to match changes made to the Python SDK.
 
+            ## Python SDK Available (READ-ONLY)
+
+            The complete Python SDK is available at `./python-sdk/videodb/` for you to read.
+            You have FULL ACCESS to read any Python file to understand the complete context.
+
+            ⚠️ IMPORTANT: The `python-sdk/` directory is READ-ONLY for reference.
+            - DO NOT write, modify, or create any files in `python-sdk/`
+            - DO NOT attempt to commit or push changes to the Python SDK
+            - ONLY read from `python-sdk/` to understand the source code
+            - ONLY write to the Node SDK files in `src/`
+
             ## Git Diff of Python SDK Changes
 
             The following diff shows what changed in the Python SDK:
@@ -121,13 +158,19 @@ jobs:
             ## Your Task
 
             1. **Identify which Python files changed** in the diff above
-            2. **Find the corresponding Node SDK file** using the mapping table
-            3. **Read both files** to understand the current implementation
-            4. **Replicate the exact same changes** in the Node SDK file:
+            2. **Read the FULL Python file** from `./python-sdk/videodb/` to understand:
+               - The complete context of the change
+               - What class/enum/function the change belongs to
+               - The surrounding code structure
+            3. **Find the corresponding Node SDK file** using the mapping table
+            4. **Read the Node SDK file** to understand current patterns
+            5. **Replicate the exact same changes** in the Node SDK file:
                - If a new method was added in Python, add the equivalent method in Node
-               - If a constant was added, add it to constants.ts
+               - If a constant was added, add it to the same location in constants.ts
                - If a new class was added, create the corresponding TypeScript class
                - If parameters were added/changed, update the Node version accordingly
+
+            IMPORTANT: Always read the full Python source file, not just the diff, to understand WHERE and HOW to add the code.
 
             ## Translation Rules
 
@@ -170,6 +213,7 @@ jobs:
 
           # Clean up temporary files - DO NOT commit these
           rm -f python.diff
+          rm -rf python-sdk
 
           # Configure git
           git config user.name "github-actions[bot]"
