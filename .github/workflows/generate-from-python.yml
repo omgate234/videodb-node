@@ -7,12 +7,14 @@ on:
   # Manual trigger for testing
   workflow_dispatch:
     inputs:
-      before_sha:
-        description: 'Before commit SHA in Python SDK'
-        required: false
-      after_sha:
-        description: 'After commit SHA in Python SDK'
-        required: false
+      source_branch:
+        description: 'Python SDK branch to clone (has the updated code)'
+        required: true
+        default: 'main'
+      target_branch:
+        description: 'Target branch for PR (will be created from main if not exists)'
+        required: true
+        default: 'main'
 
 jobs:
   generate:
@@ -27,82 +29,95 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set commit SHAs
-        id: shas
+      - name: Set branch info
+        id: branches
         run: |
           if [[ "${{ github.event_name }}" == "repository_dispatch" ]]; then
-            echo "before_sha=${{ github.event.client_payload.before_sha }}" >> $GITHUB_OUTPUT
-            echo "after_sha=${{ github.event.client_payload.after_sha }}" >> $GITHUB_OUTPUT
-            echo "source_repo=${{ github.event.client_payload.source_repo }}" >> $GITHUB_OUTPUT
-            echo "commit_message=${{ github.event.client_payload.commit_message }}" >> $GITHUB_OUTPUT
-            echo "changed_files=${{ github.event.client_payload.changed_files }}" >> $GITHUB_OUTPUT
+            SOURCE_BRANCH="${{ github.event.client_payload.source_branch }}"
+            TARGET_BRANCH="${{ github.event.client_payload.target_branch }}"
+            TRIGGER_TYPE="${{ github.event.client_payload.trigger_type }}"
           else
-            # Manual trigger
-            SOURCE_REPO="${{ github.repository_owner }}/videodb-python"
-            echo "source_repo=$SOURCE_REPO" >> $GITHUB_OUTPUT
-            echo "commit_message=Manual trigger" >> $GITHUB_OUTPUT
-            echo "changed_files=" >> $GITHUB_OUTPUT
-
-            if [[ -n "${{ inputs.before_sha }}" ]]; then
-              echo "before_sha=${{ inputs.before_sha }}" >> $GITHUB_OUTPUT
-            else
-              echo "before_sha=" >> $GITHUB_OUTPUT
-            fi
-
-            if [[ -n "${{ inputs.after_sha }}" ]]; then
-              echo "after_sha=${{ inputs.after_sha }}" >> $GITHUB_OUTPUT
-            else
-              echo "after_sha=main" >> $GITHUB_OUTPUT
-            fi
+            SOURCE_BRANCH="${{ inputs.source_branch }}"
+            TARGET_BRANCH="${{ inputs.target_branch }}"
+            TRIGGER_TYPE="manual"
           fi
+
+          echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
+          echo "target_branch=$TARGET_BRANCH" >> $GITHUB_OUTPUT
+          echo "trigger_type=$TRIGGER_TYPE" >> $GITHUB_OUTPUT
+
+          echo "Source branch (Python SDK): $SOURCE_BRANCH"
+          echo "Target branch (Node SDK): $TARGET_BRANCH"
+          echo "Trigger type: $TRIGGER_TYPE"
+
+      - name: Setup target branch
+        id: setup_branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TARGET_BRANCH="${{ steps.branches.outputs.target_branch }}"
+
+          # Check if target branch exists in Node SDK
+          if git ls-remote --exit-code --heads origin "$TARGET_BRANCH" > /dev/null 2>&1; then
+            echo "Branch $TARGET_BRANCH exists, checking out"
+            git checkout "$TARGET_BRANCH"
+            git pull origin "$TARGET_BRANCH"
+            echo "branch_created=false" >> $GITHUB_OUTPUT
+          else
+            echo "Branch $TARGET_BRANCH does not exist, creating from main"
+            git checkout main
+            git pull origin main
+            git checkout -b "$TARGET_BRANCH"
+            git push -u origin "$TARGET_BRANCH"
+            echo "branch_created=true" >> $GITHUB_OUTPUT
+          fi
+
+          echo "Currently on branch: $(git branch --show-current)"
 
       - name: Clone Python SDK
         env:
           GH_TOKEN: ${{ secrets.SDK_SYNC_PAT }}
         run: |
-          SOURCE_REPO="${{ steps.shas.outputs.source_repo }}"
-          AFTER_SHA="${{ steps.shas.outputs.after_sha }}"
+          SOURCE_BRANCH="${{ steps.branches.outputs.source_branch }}"
+          PYTHON_REPO="${{ github.repository_owner }}/videodb-python"
 
-          echo "Cloning Python SDK from $SOURCE_REPO at $AFTER_SHA"
+          echo "Cloning Python SDK from $PYTHON_REPO @ $SOURCE_BRANCH"
 
-          # Clone the Python SDK into a subdirectory
-          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${SOURCE_REPO}.git" python-sdk
+          # Clone the Python SDK at the source branch
+          git clone --depth 1 --branch "$SOURCE_BRANCH" \
+            "https://x-access-token:${GH_TOKEN}@github.com/${PYTHON_REPO}.git" python-sdk
 
-          # Checkout the specific commit if provided
-          if [[ -n "$AFTER_SHA" && "$AFTER_SHA" != "main" ]]; then
-            cd python-sdk
-            git fetch --depth 1 origin "$AFTER_SHA"
-            git checkout "$AFTER_SHA"
-            cd ..
-          fi
-
-          # Remove .git directory - makes it READ-ONLY reference, impossible to push
+          # Remove .git directory - makes it READ-ONLY reference
           rm -rf python-sdk/.git
 
           echo "Python SDK cloned as read-only reference"
           ls -la python-sdk/videodb/
 
       - name: Fetch Python SDK diff
-        id: diff
         env:
           GH_TOKEN: ${{ secrets.SDK_SYNC_PAT }}
         run: |
-          SOURCE_REPO="${{ steps.shas.outputs.source_repo }}"
-          BEFORE_SHA="${{ steps.shas.outputs.before_sha }}"
-          AFTER_SHA="${{ steps.shas.outputs.after_sha }}"
+          TRIGGER_TYPE="${{ steps.branches.outputs.trigger_type }}"
+          PYTHON_REPO="${{ github.repository_owner }}/videodb-python"
 
-          echo "Fetching diff from $SOURCE_REPO"
-          echo "Before: $BEFORE_SHA"
-          echo "After: $AFTER_SHA"
+          if [[ "$TRIGGER_TYPE" == "code_change" ]]; then
+            # For code changes, fetch diff using SHAs from payload
+            BEFORE_SHA="${{ github.event.client_payload.before_sha }}"
+            AFTER_SHA="${{ github.event.client_payload.after_sha }}"
 
-          # Fetch the diff
-          if [[ -n "$BEFORE_SHA" ]]; then
-            gh api \
-              -H "Accept: application/vnd.github.v3.diff" \
-              "/repos/$SOURCE_REPO/compare/${BEFORE_SHA}...${AFTER_SHA}" \
-              > python.diff 2>/dev/null || echo "Could not fetch diff"
+            if [[ -n "$BEFORE_SHA" && -n "$AFTER_SHA" ]]; then
+              echo "Fetching diff for code change: $BEFORE_SHA...$AFTER_SHA"
+              gh api \
+                -H "Accept: application/vnd.github.v3.diff" \
+                "/repos/$PYTHON_REPO/compare/${BEFORE_SHA}...${AFTER_SHA}" \
+                > python.diff 2>/dev/null || touch python.diff
+            else
+              touch python.diff
+            fi
           else
-            echo "No before SHA available"
+            # For spec changes, the diff is in the Python SDK code itself
+            # We'll show the changed files instead
+            echo "Spec change trigger - Python SDK already has the changes"
             touch python.diff
           fi
 
@@ -111,7 +126,7 @@ jobs:
       - name: Fetch prompt and build context
         run: |
           # Fetch static prompt from agent-toolkit
-          curl -sL https://raw.githubusercontent.com/video-db/agent-toolkit/main/context/prompts/python-to-node.txt > static_prompt.md
+          curl -sL https://raw.githubusercontent.com/video-db/agent-toolkit/main/context/prompts/python-to-node.txt > static_prompt.txt
 
           # Build full prompt with dynamic content
           cat > codex_prompt.md << 'PROMPT_EOF'
@@ -132,7 +147,7 @@ jobs:
           PROMPT_EOF
 
           # Append static instructions
-          cat static_prompt.md >> codex_prompt.md
+          cat static_prompt.txt >> codex_prompt.md
 
           echo "Prompt built successfully"
 
@@ -148,13 +163,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Save diff content for PR body before cleanup
-          DIFF_CONTENT=$(head -200 python.diff 2>/dev/null || echo "No diff available")
-
-          # Clean up temporary files - DO NOT commit these
-          rm -f python.diff static_prompt.md codex_prompt.md
-          rm -rf python-sdk
-
           # Configure git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -165,34 +173,43 @@ jobs:
             exit 0
           fi
 
-          # Create branch
-          BRANCH="auto/python-sync-$(date +%Y%m%d-%H%M%S)"
-          git checkout -b "$BRANCH"
+          # Clean up temporary files - DO NOT commit these
+          rm -f python.diff static_prompt.txt codex_prompt.md
+          rm -rf python-sdk
+
+          # Get branch info
+          TARGET_BRANCH="${{ steps.branches.outputs.target_branch }}"
+          SOURCE_BRANCH="${{ steps.branches.outputs.source_branch }}"
+          TRIGGER_TYPE="${{ steps.branches.outputs.trigger_type }}"
+
+          # Create work branch
+          WORK_BRANCH="auto/python-sync-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$WORK_BRANCH"
           git add -A
 
           # Commit
-          COMMIT_MSG="${{ steps.shas.outputs.commit_message }}"
           git commit -m "feat: sync with Python SDK
 
-          Source: ${{ steps.shas.outputs.source_repo }}@${{ steps.shas.outputs.after_sha }}
-          Original commit: ${COMMIT_MSG}
+          Source: videodb-python@${SOURCE_BRANCH}
+          Target: ${TARGET_BRANCH}
+          Trigger: ${TRIGGER_TYPE}
 
           Generated by OpenAI Codex"
 
           # Push
-          git push origin "$BRANCH"
+          git push origin "$WORK_BRANCH"
 
-          # Create PR
+          # Create PR targeting the target branch
           gh pr create \
+            --base "$TARGET_BRANCH" \
             --title "feat: sync with Python SDK" \
             --body "## Summary
 
           Automated SDK update to match Python SDK changes.
 
-          **Source**: \`${{ steps.shas.outputs.source_repo }}\`
-          **Commit**: \`${{ steps.shas.outputs.after_sha }}\`
-          **Original message**: ${{ steps.shas.outputs.commit_message }}
-
+          **Python SDK branch**: \`$SOURCE_BRANCH\`
+          **Target branch**: \`$TARGET_BRANCH\`
+          **Trigger type**: \`$TRIGGER_TYPE\`
 
           ## Review Checklist
 
