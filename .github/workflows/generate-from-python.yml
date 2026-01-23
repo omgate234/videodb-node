@@ -98,6 +98,8 @@ jobs:
           GH_TOKEN: ${{ secrets.SDK_SYNC_PAT }}
         run: |
           TRIGGER_TYPE="${{ steps.branches.outputs.trigger_type }}"
+          SOURCE_BRANCH="${{ steps.branches.outputs.source_branch }}"
+          TARGET_BRANCH="${{ steps.branches.outputs.target_branch }}"
           PYTHON_REPO="${{ github.repository_owner }}/videodb-python"
 
           if [[ "$TRIGGER_TYPE" == "code_change" ]]; then
@@ -115,10 +117,12 @@ jobs:
               touch python.diff
             fi
           else
-            # For spec changes, the diff is in the Python SDK code itself
-            # We'll show the changed files instead
-            echo "Spec change trigger - Python SDK already has the changes"
-            touch python.diff
+            # For spec changes, compare target_branch vs source_branch
+            echo "Fetching diff for spec change: $TARGET_BRANCH...$SOURCE_BRANCH"
+            gh api \
+              -H "Accept: application/vnd.github.v3.diff" \
+              "/repos/$PYTHON_REPO/compare/${TARGET_BRANCH}...${SOURCE_BRANCH}" \
+              > python.diff 2>/dev/null || touch python.diff
           fi
 
           echo "Diff size: $(wc -l < python.diff) lines"
