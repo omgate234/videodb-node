@@ -439,8 +439,8 @@ console.log(playerUrl);
 #### Delete the video
 
 ```ts
-// Delete the video from the collection
-await video.delete();
+// Delete the video from the collection (pass true to confirm)
+await video.delete(true);
 ```
 
 ### 🌟 More on `Collection` object
@@ -460,7 +460,8 @@ const myVideo = coll.getVideo(id);
 #### Delete a video
 
 ```ts
-await coll.deleteVideo();
+// Delete a video from the collection (pass true to confirm)
+await coll.deleteVideo('VIDEO_ID', true);
 ```
 
 ---

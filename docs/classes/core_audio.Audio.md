@@ -69,7 +69,7 @@ Initializes a VideoDB Instance
 
 ### delete
 
-▸ **delete**(): `Promise`\<[`ResponseOf`](../modules/types_response.md#responseof)\<`Record`\<`string`, `never`\>\>\>
+▸ **delete**(force: boolean): `Promise`\<[`ResponseOf`](../modules/types_response.md#responseof)\<`Record`\<`string`, `never`\>\>\>
 
 Returns an empty promise that resolves when the audio is deleted
 

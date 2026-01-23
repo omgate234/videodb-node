@@ -69,11 +69,11 @@ Initializes a VideoDB Instance
 
 ## Methods
 
-### delete
+### delete(force)
 
-▸ **delete**(): `Promise`\<[`ResponseOf`](../modules/types_response.md#responseof)\<`Record`\<`string`, `never`\>\>\>
+▸ **delete**(force: boolean): `Promise`\<[`ResponseOf`](../modules/types_response.md#responseof)\<`Record`\<`string`, `never`\>\>\>
 
-Returns an empty promise that resolves when the image is deleted
+Deletes the image with confirmation when force is true.
 
 #### Returns
 
