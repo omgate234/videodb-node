@@ -75,18 +75,23 @@ export class Collection implements ICollection {
   };
 
   /**
-   *
-   * @param videoId - Id of the video to be deleted
-   * @returns A promise that resolves when delete is successful
-   * @throws an error if the request fails
+   * Deletes a video from the collection with confirmation.
+   * @param videoId - Id of the video to be deleted.
+   * @param force - Must be true to confirm deletion.
+   * @returns A promise that resolves when deletion is successful.
+   * @throws Error if force is false, VideodbError or InvalidRequestError if request fails.
    */
-  public deleteVideo = async (videoId: string) => {
+  public deleteVideo = async (videoId: string, force: boolean) => {
     if (!videoId.trim()) {
       throw new VideodbError('Video ID cannot be empty');
     }
-    return await this.#vhttp.delete<Record<string, never>>([video, videoId], {
-      params: { collection_id: this.meta.id },
-    });
+    if (!force) {
+      throw new Error("Parameter 'force' must be true to confirm deletion.");
+    }
+    return await this.#vhttp.delete<Record<string, never>>(
+      [video, videoId],
+      { params: { collection_id: this.meta.id }, data: { force } }
+    );
   };
 
   /** * Get all audios from the collection
@@ -127,13 +132,24 @@ export class Collection implements ICollection {
    * @returns A promise that resolves when delete is successful
    * @throws an error if the request fails
    */
-  public deleteAudio = async (audioId: string) => {
+  /**
+   * Deletes an audio from the collection with confirmation.
+   * @param audioId - Id of the audio to be deleted.
+   * @param force - Must be true to confirm deletion.
+   * @returns A promise that resolves when deletion is successful.
+   * @throws Error if force is false, VideodbError or InvalidRequestError if request fails.
+   */
+  public deleteAudio = async (audioId: string, force: boolean) => {
     if (!audioId.trim()) {
       throw new VideodbError('Audio ID cannot be empty');
     }
-    return await this.#vhttp.delete<Record<string, never>>([audio, audioId], {
-      params: { collection_id: this.meta.id },
-    });
+    if (!force) {
+      throw new Error("Parameter 'force' must be true to confirm deletion.");
+    }
+    return await this.#vhttp.delete<Record<string, never>>(
+      [audio, audioId],
+      { params: { collection_id: this.meta.id }, data: { force } }
+    );
   };
 
   /** * Get all images from the collection
@@ -174,13 +190,24 @@ export class Collection implements ICollection {
    * @returns A promise that resolves when delete is successful
    * @throws an error if the request fails
    */
-  public deleteImage = async (imageId: string) => {
+  /**
+   * Deletes an image from the collection with confirmation.
+   * @param imageId - Id of the image to be deleted.
+   * @param force - Must be true to confirm deletion.
+   * @returns A promise that resolves when deletion is successful.
+   * @throws Error if force is false, VideodbError or InvalidRequestError if request fails.
+   */
+  public deleteImage = async (imageId: string, force: boolean) => {
     if (!imageId.trim()) {
       throw new VideodbError('Image ID cannot be empty');
     }
-    return await this.#vhttp.delete<Record<string, never>>([image, imageId], {
-      params: { collection_id: this.meta.id },
-    });
+    if (!force) {
+      throw new Error("Parameter 'force' must be true to confirm deletion.");
+    }
+    return await this.#vhttp.delete<Record<string, never>>(
+      [image, imageId],
+      { params: { collection_id: this.meta.id }, data: { force } }
+    );
   };
 
   /**

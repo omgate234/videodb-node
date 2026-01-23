@@ -146,11 +146,11 @@ an awaited stream url for subtitled overlayed video
 
 ___
 
-### delete
+### delete(force)
 
-▸ **delete**(): `Promise`\<[`ResponseOf`](../modules/types_response.md#responseof)\<`Record`\<`string`, `never`\>\>\>
+▸ **delete**(force: boolean): `Promise`\<[`ResponseOf`](../modules/types_response.md#responseof)\<`Record`\<`string`, `never`\>\>\>
 
-Returns an empty promise that resolves when the video is deleted
+Deletes the video with confirmation when force is true.
 
 #### Returns
 

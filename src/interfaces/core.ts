@@ -22,9 +22,18 @@ export interface ICollection {
   meta: CollectionBase;
   getVideos: () => Promise<Video[]>;
   getVideo: (videoId: string) => Promise<Video>;
-  deleteVideo: (videoId: string) => Promise<object>;
+  /**
+   * Deletes a video from the collection with confirmation.
+   * @param videoId - Id of the video to be deleted.
+   * @param force - Must be true to confirm deletion.
+   * @returns A promise that resolves when deletion is successful.
+   */
+  deleteVideo: (videoId: string, force: boolean) => Promise<object>;
   uploadFile: (data: FileUploadConfig) => Promise<void | UploadJob>;
   uploadURL: (data: URLUploadConfig) => Promise<void | UploadJob>;
+  /**
+   * Searches within a collection.
+   */
   search: (query: string, searchType?: SearchType) => Promise<SearchResult>;
 }
 
@@ -76,6 +85,12 @@ export interface AudioBase {
  */
 export interface IAudio {
   meta: AudioBase;
+  /**
+   * Deletes the audio with confirmation.
+   * @param force - Must be true to confirm deletion.
+   * @returns A promise that resolves when deletion is successful.
+   */
+  delete(force: boolean): Promise<Record<string, never>>;
 }
 
 /**

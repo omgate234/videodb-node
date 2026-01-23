@@ -22,16 +22,20 @@ export class Audio implements IAudio {
     this.meta = data;
     this.#vhttp = http;
   }
-
+  
   /**
-   * Returns an empty promise that resolves when the audio is deleted
-   * @returns A promise that resolves when delete is successful
-   * @throws an InvalidRequestError if the request fails
+   * Deletes the audio with confirmation.
+   * @param force - Must be true to confirm deletion.
+   * @returns A promise that resolves when deletion is successful.
+   * @throws Error if force is false, InvalidRequestError if request fails.
    */
-  public delete = async () => {
-    return await this.#vhttp.delete<Record<string, never>>([
-      audio,
-      this.meta.id,
-    ]);
+  public delete = async (force: boolean) => {
+    if (!force) {
+      throw new Error("Parameter 'force' must be true to confirm deletion.");
+    }
+    return await this.#vhttp.delete<Record<string, never>>(
+      [audio, this.meta.id],
+      { data: { force } }
+    );
   };
 }

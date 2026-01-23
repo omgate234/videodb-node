@@ -76,15 +76,16 @@ The base class through which all videodb actions are possible
 
 ## Methods
 
-### deleteAudio
+### deleteAudio(audioId, force)
 
-▸ **deleteAudio**(`audioId`): `Promise`\<[`ResponseOf`](../modules/types_response.md#responseof)\<`Record`\<`string`, `never`\>\>\>
+▸ **deleteAudio**(`audioId`: string, `force`: boolean): `Promise`\<[`ResponseOf`](../modules/types_response.md#responseof)\<`Record`\<`string`, `never`\>\>\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `audioId` | `string` |
+| `force` | `boolean` | Must be true to confirm deletion. |
 
 #### Returns
 
@@ -94,7 +95,7 @@ A promise that resolves when delete is successful
 
 **`Throws`**
 
-an error if the request fails
+Error if force is false, VideodbError or InvalidRequestError if request fails
 
 #### Defined in
 
@@ -102,15 +103,16 @@ an error if the request fails
 
 ___
 
-### deleteImage
+### deleteImage(imageId, force)
 
-▸ **deleteImage**(`imageId`): `Promise`\<[`ResponseOf`](../modules/types_response.md#responseof)\<`Record`\<`string`, `never`\>\>\>
+▸ **deleteImage**(`imageId`: string, `force`: boolean): `Promise`\<[`ResponseOf`](../modules/types_response.md#responseof)\<`Record`\<`string`, `never`\>\>\>
 
 #### Parameters
 
 | Name | Type |
 | :------ | :------ |
 | `imageId` | `string` |
+| `force` | `boolean` | Must be true to confirm deletion. |
 
 #### Returns
 
@@ -120,7 +122,7 @@ A promise that resolves when delete is successful
 
 **`Throws`**
 
-an error if the request fails
+Error if force is false, VideodbError or InvalidRequestError if request fails
 
 #### Defined in
 
@@ -128,15 +130,16 @@ an error if the request fails
 
 ___
 
-### deleteVideo
+### deleteVideo(videoId, force)
 
-▸ **deleteVideo**(`videoId`): `Promise`\<[`ResponseOf`](../modules/types_response.md#responseof)\<`Record`\<`string`, `never`\>\>\>
+▸ **deleteVideo**(`videoId`: string, `force`: boolean): `Promise`\<[`ResponseOf`](../modules/types_response.md#responseof)\<`Record`\<`string`, `never`\>\>\>
 
 #### Parameters
 
 | Name | Type | Description |
 | :------ | :------ | :------ |
 | `videoId` | `string` | Id of the video to be deleted |
+| `force` | `boolean` | Must be true to confirm deletion. |
 
 #### Returns
 
@@ -146,7 +149,7 @@ A promise that resolves when delete is successful
 
 **`Throws`**
 
-an error if the request fails
+Error if force is false, VideodbError or InvalidRequestError if request fails
 
 #### Implementation of
 

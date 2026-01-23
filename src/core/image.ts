@@ -22,15 +22,19 @@ export class Image implements IImage {
   }
 
   /**
-   * Returns an empty promise that resolves when the image is deleted
-   * @returns A promise that resolves when delete is successful
-   * @throws an InvalidRequestError if the request fails
+   * Deletes the image with confirmation.
+   * @param force - Must be true to confirm deletion.
+   * @returns A promise that resolves when deletion is successful.
+   * @throws Error if force is false and InvalidRequestError if request fails.
    */
-  public delete = async () => {
-    return await this.#vhttp.delete<Record<string, never>>([
-      ApiPath.image,
-      this.meta.id,
-    ]);
+  public delete = async (force: boolean) => {
+    if (!force) {
+      throw new Error("Parameter 'force' must be true to confirm deletion.");
+    }
+    return await this.#vhttp.delete<Record<string, never>>(
+      [ApiPath.image, this.meta.id],
+      { data: { force } }
+    );
   };
 }
 
